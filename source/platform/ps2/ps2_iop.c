@@ -36,6 +36,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <io_common.h>
 #include <ps2sdkapi.h>
 
 #include "ps2_iop.h"
