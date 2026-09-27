@@ -854,6 +854,7 @@ typedef struct {
 #define OUT_RIGHT  4
 #define OUT_BOTTOM 8
 #define OUT_TOP    16
+#define OUT_FAR    32
 
 typedef struct {
 	int stride;
@@ -1030,6 +1031,7 @@ static inline int outcode(const cvert_t *v)
 	int o = 0;
 	float w = v->w;
 	if (v->z < -w) o |= OUT_NEAR;
+	if (v->z >  w) o |= OUT_FAR;
 	if (v->x < -gb_x * w) o |= OUT_LEFT;
 	if (v->x >  gb_x * w) o |= OUT_RIGHT;
 	if (v->y < -gb_y * w) o |= OUT_BOTTOM;
@@ -1041,6 +1043,7 @@ static inline float plane_dist(const cvert_t *v, int plane)
 {
 	switch (plane) {
 	case OUT_NEAR:   return v->z + v->w;
+	case OUT_FAR:    return v->w - v->z;
 	case OUT_LEFT:   return v->x + gb_x * v->w;
 	case OUT_RIGHT:  return gb_x * v->w - v->x;
 	case OUT_BOTTOM: return v->y + gb_y * v->w;
@@ -1067,7 +1070,7 @@ static int clip_polygon(cvert_t *in, int n, int planes, cvert_t *out)
 	cvert_t tmp[CLIP_MAX];
 	cvert_t *src = in, *dst = tmp;
 	int p;
-	for (p = OUT_NEAR; p <= OUT_TOP; p <<= 1) {
+	for (p = OUT_NEAR; p <= OUT_FAR; p <<= 1) {
 		int i, m = 0;
 		if (!(planes & p))
 			continue;
