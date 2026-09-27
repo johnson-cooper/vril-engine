@@ -1719,7 +1719,7 @@ int GS_Init(int force_mode, int want_z24)
 	ring_end = gs_video.tex_end >> 6;
 	ring_ptr = ring_base;
 
-	graph_set_mode(GRAPH_MODE_INTERLACED, mode, GRAPH_MODE_FRAME, GRAPH_ENABLE);
+	graph_set_mode(GRAPH_MODE_INTERLACED, mode, GRAPH_MODE_FIELD, GRAPH_ENABLE);
 	graph_set_screen(0, 0, gs_video.width, gs_video.height);
 	graph_set_bgcolor(0, 0, 0);
 	graph_set_framebuffer_filtered(gs_video.fb_addr[0], gs_video.width, gs_video.fb_psm, 0, 0);
