@@ -287,6 +287,71 @@ int PS2_IOP_ShouldWaitForDevice(const char *root)
 	return strncmp(root, "host:", 5) != 0;
 }
 
+static int prepare_mass_boot_path(const char *boot_path, char *resolved, int resolved_size)
+{
+	char normalized[512];
+	char candidate[512];
+	const char *colon;
+	const char *suffix;
+	ps2_clock_t start;
+	size_t i;
+	int unit;
+
+	if (!boot_path || strncmp(boot_path, "mass", 4))
+		return 0;
+
+	snprintf(normalized, sizeof(normalized), "%s", boot_path);
+	for (i = 0; normalized[i]; i++)
+		if (normalized[i] == '\\')
+			normalized[i] = '/';
+
+	colon = strchr(normalized, ':');
+	if (!colon) {
+		PS2_Log("IOP: malformed mass boot path: %s\n", normalized);
+		return -1;
+	}
+	suffix = colon + 1;
+	if (!*suffix)
+		suffix = "/";
+
+	// BDM numbering belongs to the current IOP session. A launcher may have
+	// called the boot device mass1:, while after our clean reset the same
+	// physical drive becomes mass0:. Find the actual post-reset unit by
+	// probing the exact ELF path, preferring the original name first.
+	start = ps2_clock();
+	for (;;) {
+		int fd = open(normalized, O_RDONLY);
+		if (fd >= 0) {
+			close(fd);
+			snprintf(resolved, resolved_size, "%s", normalized);
+			return 1;
+		}
+
+		for (unit = 0; unit < 10; unit++) {
+			if (suffix[0] == '/')
+				snprintf(candidate, sizeof(candidate), "mass%d:%s", unit, suffix);
+			else
+				snprintf(candidate, sizeof(candidate), "mass%d:/%s", unit, suffix);
+			fd = open(candidate, O_RDONLY);
+			if (fd >= 0) {
+				close(fd);
+				snprintf(resolved, resolved_size, "%s", candidate);
+				if (strcmp(normalized, candidate))
+					PS2_Log("IOP: BDM boot device renumbered %.*s -> mass%d:\n",
+						(int)(colon - normalized + 1), normalized, unit);
+				return 1;
+			}
+		}
+
+		if ((int)((ps2_clock() - start) / PS2_CLOCKS_PER_MSEC) > 10000)
+			break;
+		DelayThread(50 * 1000);
+	}
+
+	PS2_Log("IOP: could not locate boot file after BDM enumeration: %s\n", normalized);
+	return -1;
+}
+
 static int prepare_hdd_boot_path(const char *boot_path, char *resolved, int resolved_size)
 {
 	char normalized[512];
@@ -359,7 +424,7 @@ static int prepare_hdd_boot_path(const char *boot_path, char *resolved, int reso
 
 int PS2_IOP_PrepareBootPath(const char *boot_path, char *resolved, int resolved_size)
 {
-	int hdd;
+	int prepared;
 
 	if (!resolved || resolved_size <= 0)
 		return 0;
@@ -368,10 +433,16 @@ int PS2_IOP_PrepareBootPath(const char *boot_path, char *resolved, int resolved_
 	if (!boot_path || !*boot_path)
 		return 1;
 
-	hdd = prepare_hdd_boot_path(boot_path, resolved, resolved_size);
-	if (hdd < 0)
+	prepared = prepare_mass_boot_path(boot_path, resolved, resolved_size);
+	if (prepared < 0)
 		return 0;
-	if (hdd > 0)
+	if (prepared > 0)
+		return 1;
+
+	prepared = prepare_hdd_boot_path(boot_path, resolved, resolved_size);
+	if (prepared < 0)
+		return 0;
+	if (prepared > 0)
 		return 1;
 
 	snprintf(resolved, resolved_size, "%s", boot_path);
