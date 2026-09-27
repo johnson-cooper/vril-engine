@@ -26,8 +26,13 @@ extern "C" {
 #define PS2_IOP_CORE     (1 << 0)   // iomanX + fileXio
 #define PS2_IOP_PAD      (1 << 1)   // sio2man + padman
 #define PS2_IOP_MC       (1 << 2)   // mcman + mcserv
-#define PS2_IOP_USB      (1 << 3)   // usbd + bdm + fat + usb mass storage
+#define PS2_IOP_MASS     (1 << 3)   // BDM/FAT + USB/MX4SIO/i.Link mass transports
 #define PS2_IOP_AUDIO    (1 << 4)   // libsd + nzpsnd
+#define PS2_IOP_MMCE     (1 << 5)   // mmceman (mmce0:/mmce1:)
+#define PS2_IOP_HDD      (1 << 6)   // dev9 + atad + APA + PFS
+
+// Backwards-compatible name used by older PS2 port code.
+#define PS2_IOP_USB PS2_IOP_MASS
 
 // Bring the IOP to a known state and load the requested module groups.
 // boot_path is argv[0]; reset is skipped when `no_reset` is set (needed when
@@ -37,7 +42,24 @@ int  PS2_IOP_GroupReady(int group);
 void PS2_IOP_Report(void);
 
 // Storage
-// Wait until a block device (mass:, ...) answers, up to timeout_ms.
+// Select the minimum storage stack needed to recover argv[0] after an IOP
+// reset. BDM-backed media all reappear as massN: devices.
+int  PS2_IOP_StorageGroupsForBootPath(const char *boot_path);
+
+// Some launchers pass an already-mounted pfsN: path without the APA partition
+// name needed to recreate that mount. Keep the launcher's IOP in that case.
+int  PS2_IOP_BootPathNeedsNoReset(const char *boot_path);
+
+// Recreate device state destroyed by an IOP reset and return a path that can
+// be used by the normal POSIX/fileXio layer. HDD boot paths are remounted as
+// pfs0:; other devices are copied unchanged.
+int  PS2_IOP_PrepareBootPath(const char *boot_path, char *resolved, int resolved_size);
+
+// Whether a device can enumerate asynchronously and should be waited for
+// before setup.ini/assets are opened.
+int  PS2_IOP_ShouldWaitForDevice(const char *root);
+
+// Wait until a storage device answers, up to timeout_ms.
 int  PS2_WaitForDevice(const char *root, int timeout_ms);
 
 #ifdef __cplusplus
