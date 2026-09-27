@@ -89,23 +89,34 @@ int main(int argc, char **argv)
 	const char *base_directory;
 	char setup_path[MAX_OSPATH];
 	char startup_error[256];
+	char resolved_boot[512];
+	const char *boot_path;
 	size_t heap_size;
 	int no_reset;
 	int groups;
 
+	boot_path = argc > 0 && argv[0] ? argv[0] : NULL;
 	printf("\nNZ:P PS2 %s (%s) built %s\n", GIT_HASH, GIT_BRANCH, BUILD_DATE);
-	printf("boot: %s\n", argc > 0 && argv[0] ? argv[0] : "(none)");
+	printf("boot: %s\n", boot_path ? boot_path : "(none)");
 
 	PS2_MemInit();
 
-	// IOP bring-up. Everything the game needs is embedded in the ELF.
-	no_reset = has_arg(argc, argv, "-noiopreset");
-	groups = PS2_IOP_CORE | PS2_IOP_PAD | PS2_IOP_MC | PS2_IOP_USB | PS2_IOP_AUDIO;
-	PS2_IOP_Init(argc > 0 ? argv[0] : NULL, groups, no_reset);
+	// IOP bring-up. The storage stack is selected from argv[0] so the game can
+	// recover the device it was launched from without keeping every driver in
+	// the 2 MiB IOP at all times.
+	no_reset = has_arg(argc, argv, "-noiopreset") ||
+	           PS2_IOP_BootPathNeedsNoReset(boot_path);
+	groups = PS2_IOP_CORE | PS2_IOP_PAD | PS2_IOP_MC | PS2_IOP_AUDIO |
+	         PS2_IOP_StorageGroupsForBootPath(boot_path);
+	PS2_IOP_Init(boot_path, groups, no_reset);
 
-	PS2_SetGameRootFromBootPath(argc > 0 ? argv[0] : NULL);
-	if (!strncmp(PS2_GetGameRoot(), "mass", 4)) {
-		if (!PS2_WaitForDevice(PS2_GetGameRoot(), 8000))
+	if (!PS2_IOP_PrepareBootPath(boot_path, resolved_boot, sizeof(resolved_boot)))
+		Sys_Error("PS2: could not restore boot storage for %s",
+			boot_path ? boot_path : "(none)");
+
+	PS2_SetGameRootFromBootPath(resolved_boot[0] ? resolved_boot : boot_path);
+	if (PS2_IOP_ShouldWaitForDevice(PS2_GetGameRoot())) {
+		if (!PS2_WaitForDevice(PS2_GetGameRoot(), 10000))
 			printf("warning: %s did not become ready\n", PS2_GetGameRoot());
 	}
 	printf("game root: %s\n", PS2_GetGameRoot());
