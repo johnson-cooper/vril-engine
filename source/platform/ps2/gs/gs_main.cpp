@@ -2163,6 +2163,8 @@ void R_RenderScene (void)
 
 	// set drawing parms
 	GS_Disable(GS_CAP_BLEND);
+	// world textures tile; 2D drawing leaves the wrap mode at clamp
+	GS_TexWrap(GS_REPEAT, GS_REPEAT);
 	GS_Disable(GS_CAP_ALPHA_TEST);
 	GS_TexFunc(GS_TFX_REPLACE, GS_TCC_RGBA);
 

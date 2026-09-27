@@ -117,6 +117,9 @@ int main(int argc, char **argv)
 
 	{
 		double oldtime = Sys_FloatTime();
+		double map_start = 0;
+		struct model_s *last_world = NULL;
+		int spawn_reported = 0;
 		for (;;) {
 			double now = Sys_FloatTime();
 			PS2_ProfileBeginFrame();
@@ -125,6 +128,19 @@ int main(int argc, char **argv)
 			PS2_MemSample();
 			PS2_ProfileEndFrame();
 			oldtime = now;
+
+			// Memory checkpoints: after the level has been running a few
+			// seconds (entities/AI spawned), and after it is unloaded.
+			if (cl.worldmodel != last_world) {
+				if (!cl.worldmodel && last_world)
+					PS2_MemReport("after map unload");
+				last_world = cl.worldmodel;
+				map_start = now;
+				spawn_reported = 0;
+			} else if (cl.worldmodel && !spawn_reported && now - map_start > 8.0) {
+				PS2_MemReport("after spawning gameplay entities");
+				spawn_reported = 1;
+			}
 		}
 	}
 	return 0;

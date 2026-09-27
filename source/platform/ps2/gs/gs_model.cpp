@@ -1506,6 +1506,9 @@ void Mod_LoadBrushModel (model_t *mod, void *buffer)
 	int			i, j;
 	dheader_t	*header;
     dmodel_t 	*bm;
+
+	if (!strncmp(mod->name, "maps/", 5))
+		PS2_MemReport(va("before map load: %s (file buffer resident)", mod->name));
 	loadmodel->type = mod_brush;
 
 	header = (dheader_t *)buffer;

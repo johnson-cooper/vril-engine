@@ -378,6 +378,8 @@ void R_NewMap (void)
 
 	GL_BuildLightmaps ();
 
+	PS2_MemReport(va("after map load: %s", cl.worldmodel->name));
+
 	Sky_NewMap (); //johnfitz -- skybox in worldspawn
     Fog_ParseWorldspawn ();
 
