@@ -276,7 +276,7 @@ static byte *ConvertWad3ToRGBA(miptex_t *tex) {
    return data;
 }
 
-#ifdef __PSP__
+#if defined(__PSP__) || defined(__PS2__)
 
 int WAD3_LoadTextureClut4(miptex_t *mt)
 {

@@ -267,9 +267,9 @@ image_t Image_LoadImageWithIdentifier(char *filename, char *identifier, int imag
 	platforms' respective texture upload functions 
 	==================
 	*/
-#ifdef __PSP__
+#if defined(__PSP__) || defined(__PS2__)
 	texture_index = GL_LoadImages (identifier, image_width, image_height, data, true, filter, 0, 4, keep);
-#elif __NSPIRE__
+#elif defined(__NSPIRE__)
 	qboolean transparenttoblack = (qboolean)filter;
 	texture_index = Soft_LoadTexture (identifier, image_width, image_height, data, transparenttoblack, keep);
 #else
@@ -295,7 +295,7 @@ image_t Image_LoadImage(char* filename, int image_format, int filter, bool keep,
 }
 
 // used on PSP
-#ifdef __PSP__
+#if defined(__PSP__) || defined(__PS2__)
 /*
 =============
 loadrgbafrompal

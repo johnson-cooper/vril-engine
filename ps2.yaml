@@ -1,0 +1,161 @@
+# Nazi Zombies: Portable -- PlayStation 2 build definition (PS2BUILD)
+#
+#   ./tools/ps2/build.sh        (generates source/_build_info.h, then runs ps2build build)
+#   ps2build build              (if source/_build_info.h already exists)
+#
+# Output: build/bin/nzportable.elf
+#
+# Engine defines mirror the PSP handheld baseline (Makefile.psp) where the
+# gameplay is concerned (MAX_AI_COUNT, FULLBRIGHT, HL_RENDER, OSK) and add
+# the PS2 platform/renderer selection. See README_PS2.md.
+project: nzportable
+
+targets:
+  # ---------------------------------------------------------------------------
+  # IOP PCM streaming module (SPU2 core 0 ADMA). Embedded into the EE ELF.
+  # ---------------------------------------------------------------------------
+  - name: nzpsnd
+    type: iop
+    sources:
+      - source/platform/ps2/iop/nzpsnd/nzpsnd.c
+    include_dirs:
+      - source/platform/ps2/iop/nzpsnd
+    imports_lst: source/platform/ps2/iop/nzpsnd/imports.lst
+    headers: [loadcore, sifcmd, threadman, intrman, sysclib, stdio, libsd]
+
+  # ---------------------------------------------------------------------------
+  # GS renderer (C++ files derived from the PSP GU renderer). Built as a
+  # separate library only so it can use C++ flags; linked into the ELF.
+  # ---------------------------------------------------------------------------
+  - name: nzp_gs
+    type: ee_lib
+    sources:
+      - source/platform/ps2/gs/clipping.cpp
+      - source/platform/ps2/gs/gs_draw.cpp
+      - source/platform/ps2/gs/gs_fullbright.cpp
+      - source/platform/ps2/gs/gs_main.cpp
+      - source/platform/ps2/gs/gs_mesh.cpp
+      - source/platform/ps2/gs/gs_misc.cpp
+      - source/platform/ps2/gs/gs_model.cpp
+      - source/platform/ps2/gs/gs_resample.cpp
+      - source/platform/ps2/gs/gs_surface.cpp
+      - source/platform/ps2/gs/gs_texture.cpp
+      - source/platform/ps2/gs/gs_video.cpp
+      - source/platform/ps2/gs/gs_warp.cpp
+    defines: &nzp_defines
+      - __PS2__
+      - PLATFORM_DIRECTORY=ps2
+      - PLATFORM_RENDERER=gs
+      - MAX_AI_COUNT=12
+      - FULLBRIGHT
+      - HL_RENDER
+      - RENDERER_SUPPORTS_DITHERING
+      - PLATFORM_KEYBOARD_OSK
+      - PLATFORM_SUPPORTS_RUMBLE
+    headers: [kernel, graph, dma, draw, packet2, packet, math3d]
+    cflags: [-G0, -fno-strict-aliasing, -fno-rtti, -fno-exceptions, -Wno-write-strings, -Wno-sign-compare]
+
+  # ---------------------------------------------------------------------------
+  # The game (EE)
+  # ---------------------------------------------------------------------------
+  - name: nzportable
+    type: ee
+    sources:
+      # engine
+      - source/system.c
+      - source/startup.c
+      - source/input.c
+      - source/snd_music.c
+      - source/tests/test_handler.c
+      - source/tests/test_map_boot.c
+      - source/tests/test_restart.c
+      - source/tests/test_qcvm.c
+      - source/chase.c
+      - source/cl_demo.c
+      - source/cl_input.c
+      - source/cl_main.c
+      - source/cl_parse.c
+      - source/cl_tent.c
+      - source/cl_slist.c
+      - source/cmd.c
+      - source/console.c
+      - source/crc.c
+      - source/cvar.c
+      - source/host.c
+      - source/host_cmd.c
+      - source/keys.c
+      - source/mathlib.c
+      - source/matrixlib.c
+      - source/menu/*.c
+      - source/net_loop.c
+      - source/net_vcr.c
+      - source/qcvm/pr_cmds.c
+      - source/qcvm/pr_json.c
+      - source/qcvm/cJSON.c
+      - source/qcvm/pr_edict.c
+      - source/qcvm/pr_exec.c
+      - source/snd_dma.c
+      - source/snd_mem.c
+      - source/snd_mix.c
+      - source/sv_main.c
+      - source/sv_move.c
+      - source/sv_phys.c
+      - source/sv_user.c
+      - source/view.c
+      - source/wad.c
+      - source/world.c
+      - source/zone.c
+      - source/crypter.c
+      - source/images.c
+      # shared renderer front end
+      - source/render/r_hud.c
+      - source/render/r_fog.c
+      - source/render/r_entity_fragments.c
+      - source/render/r_color_quantization.c
+      - source/render/r_light.c
+      - source/render/r_mdl.c
+      - source/render/r_surface.c
+      - source/render/r_particles.c
+      - source/render/r_decals.c
+      - source/render/r_screen.c
+      # PS2 platform
+      - source/platform/ps2/common.c
+      - source/platform/ps2/net_main.c
+      - source/platform/ps2/net_dgrm.c
+      - source/platform/ps2/ps2_network.c
+      - source/platform/ps2/music.c
+      - source/platform/ps2/ps2_main.c
+      - source/platform/ps2/ps2_system.c
+      - source/platform/ps2/ps2_iop.c
+      - source/platform/ps2/ps2_mem.c
+      - source/platform/ps2/ps2_profile.c
+      - source/platform/ps2/ps2_input.c
+      - source/platform/ps2/ps2_sound.c
+      # PS2 GS backend (C part)
+      - source/platform/ps2/gs/gs_core.c
+      - source/platform/ps2/gs/gs_hyena.c
+    defines: *nzp_defines
+    cflags: [-std=gnu99, -G0, -fno-strict-aliasing, -Wno-unused-variable, -Wno-unused-but-set-variable]
+    ldflags:
+      - -Wl,-Map=nzportable.map
+      # 256 KiB main thread stack (ps2sdk default is 128 KiB)
+      - -Wl,--defsym,_stack_size=0x40000
+      # allocation failure interception for OOM reports (ps2_mem.c)
+      - -Wl,--wrap=malloc
+      - -Wl,--wrap=calloc
+      - -Wl,--wrap=realloc
+      - -Wl,--wrap=memalign
+    libs: [nzp_gs, pad, mc, filexio, patches, graph, dma, packet2, draw, debug, png, jpeg, z, m]
+    embed_irx:
+      - iomanx
+      - filexio
+      - sio2man
+      - padman
+      - mcman
+      - mcserv
+      - usbd_mini
+      - bdm
+      - bdmfs_fatfs
+      - usbmass_bd_mini
+      - libsd
+      - nzpsnd

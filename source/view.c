@@ -585,7 +585,7 @@ void V_CalcBlend (void)
 
 	for (j=0 ; j<NUM_CSHIFTS ; j++)
 	{
-#ifdef __PSP__
+#if defined(__PSP__) || defined(__PS2__)
 		if (!r_polyblend.value)
 #else
 		if (!gl_polyblend.value)

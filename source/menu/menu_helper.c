@@ -143,7 +143,7 @@ void Menu_ExitMap (void)
 	// Disconnect from server
 	Cbuf_AddText("disconnect\n");
 	// Unload textures
-#ifdef __PSP__
+#if defined(__PSP__) || defined(__PS2__)
 	GL_UnloadAllTextures();
 #elif defined(__3DS__) || defined (__PSP2__)
 	GL_UnloadTextures();

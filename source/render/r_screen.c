@@ -94,7 +94,7 @@ cvar_t 		scr_showfps = {"show_fps", "0"};
 cvar_t		scr_loadscreen = {"scr_loadscreen","1"};
 cvar_t		gl_triplebuffer = {"gl_triplebuffer", "1", true };
 cvar_t 		cl_crosshair_debug = {"cl_crosshair_debug", "0", true};
-#ifdef __PSP__
+#if defined(__PSP__) || defined(__PS2__)
 cvar_t		scr_coloredtext = {"scr_coloredtext", "1", true};
 cvar_t		scr_conheight = {"scr_conheight", "0.5"};
 cvar_t		r_dithering = {"r_dithering", "1", true};
@@ -288,7 +288,7 @@ void SCR_Init (void)
 	Cvar_RegisterVariable (&scr_showfps);
 	Cvar_RegisterVariable (&scr_loadscreen);
 	Cvar_RegisterVariable (&cl_crosshair_debug);
-#ifdef __PSP__
+#if defined(__PSP__) || defined(__PS2__)
 	Cvar_RegisterVariable (&scr_coloredtext);
 	Cvar_RegisterVariable (&scr_conheight);
 	Cvar_RegisterVariable (&r_dithering);
@@ -431,7 +431,7 @@ void SCR_DrawConsole (void)
 ============================================================================== 
 */ 
 
-#ifndef __PSP__
+#if !defined(__PSP__) && !defined(__PS2__)
 typedef struct _TargaHeader {
 	unsigned char 	id_length, colormap_type, image_type;
 	unsigned short	colormap_index, colormap_length;

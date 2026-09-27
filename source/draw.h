@@ -36,7 +36,7 @@ void Draw_TransPic (int x, int y,  int texnum);
 void Draw_SubPic (int x, int y, int pic, float s, float t, float s_coord_size, float t_coord_size, float scale, float r, float g , float b, float a);
 void Draw_ConsoleBackground (int lines);
 void Draw_AlphaPic (int x, int y,  int texnum, float alpha);
-#ifdef __PSP__
+#if defined(__PSP__) || defined(__PS2__)
 void Draw_Fill (int x, int y, int w, int h, int c);
 #endif
 void Draw_LoadingFill(void);
@@ -58,7 +58,7 @@ int Image_FindImage (const char *identifier);
 //other
 void Clear_LoadingFill (void);
 void CL_UpdateLoadingScreen(qboolean force);
-#ifdef __PSP__
+#if defined(__PSP__) || defined(__PS2__)
 byte *StringToRGB (char *s);
 #endif // __PSP__
 

@@ -244,7 +244,7 @@ void Menu_InitUI (void)
 	// two platforms which use OSK
 	// will be expanded to NSpire once
 	// button images are added.
-#if defined(__PSP__) || defined (__PSP2__)
+#if defined(__PSP__) || defined (__PSP2__) || defined(__PS2__)
 	osk_button[0] = b_leftface;
 	osk_button[1] = b_rightface;
 	osk_button[2] = b_topface;
