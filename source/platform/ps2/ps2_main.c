@@ -106,7 +106,7 @@ int main(int argc, char **argv)
 	// the 2 MiB IOP at all times.
 	no_reset = has_arg(argc, argv, "-noiopreset") ||
 	           PS2_IOP_BootPathNeedsNoReset(boot_path);
-	groups = PS2_IOP_CORE | PS2_IOP_PAD | PS2_IOP_MC | PS2_IOP_AUDIO |
+	groups = PS2_IOP_CORE | PS2_IOP_PAD | PS2_IOP_AUDIO |
 	         PS2_IOP_StorageGroupsForBootPath(boot_path);
 	PS2_IOP_Init(boot_path, groups, no_reset);
 
