@@ -254,20 +254,37 @@ int PS2_IOP_StorageGroupsForBootPath(const char *boot_path)
 
 int PS2_IOP_BootPathNeedsNoReset(const char *boot_path)
 {
-	if (!boot_path)
+	const char *colon;
+	if (!boot_path || !*boot_path)
 		return 0;
-	return !strncmp(boot_path, "pfs", 3);
+
+	// A bare pfsN: path has already lost the APA partition name needed to
+	// remount it, and host: on real hardware belongs to ps2link. Preserve
+	// those launch environments automatically.
+	if (!strncmp(boot_path, "pfs", 3) || !strncmp(boot_path, "host:", 5))
+		return 1;
+
+	// Known devices below can be rebuilt from modules embedded in this ELF.
+	if (!strncmp(boot_path, "mass", 4) ||
+	    !strncmp(boot_path, "mmce", 4) ||
+	    !strncmp(boot_path, "hdd", 3) ||
+	    !strncmp(boot_path, "mc0:", 4) ||
+	    !strncmp(boot_path, "mc1:", 4))
+		return 0;
+
+	// Generic fallback for launcher-provided devices we do not know how to
+	// recreate: if argv[0] has a device prefix, retain the launcher's IOP so
+	// the existing iomanX device registration survives.
+	colon = strchr(boot_path, ':');
+	return colon != NULL && strncmp(boot_path, "cdrom", 5) != 0;
 }
 
 int PS2_IOP_ShouldWaitForDevice(const char *root)
 {
-	if (!root)
+	if (!root || !strchr(root, ':'))
 		return 0;
-	return !strncmp(root, "mass", 4) ||
-	       !strncmp(root, "mmce", 4) ||
-	       !strncmp(root, "pfs", 3) ||
-	       !strncmp(root, "mc0:", 4) ||
-	       !strncmp(root, "mc1:", 4);
+	// host: is synchronous and waiting on it can stall PCSX2/ps2link startup.
+	return strncmp(root, "host:", 5) != 0;
 }
 
 static int prepare_hdd_boot_path(const char *boot_path, char *resolved, int resolved_size)
@@ -285,7 +302,7 @@ static int prepare_hdd_boot_path(const char *boot_path, char *resolved, int reso
 	if (!boot_path || strncmp(boot_path, "hdd0:", 5))
 		return 0;
 
-	strlcpy(normalized, boot_path, sizeof(normalized));
+	snprintf(normalized, sizeof(normalized), "%s", boot_path);
 	for (i = 0; normalized[i]; i++)
 		if (normalized[i] == '\\')
 			normalized[i] = '/';
@@ -320,11 +337,11 @@ static int prepare_hdd_boot_path(const char *boot_path, char *resolved, int reso
 
 	snprintf(partition, sizeof(partition), "hdd0:%.*s", (int)part_len, p);
 
-	ret = fileXioMount("pfs0:", partition, FIO_MT_RDONLY);
+	ret = fileXioMount("pfs0:", partition, FIO_MT_RDWR);
 	if (ret < 0) {
 		// A launcher may have left pfs0: mounted when -noiopreset was used.
 		fileXioUmount("pfs0:");
-		ret = fileXioMount("pfs0:", partition, FIO_MT_RDONLY);
+		ret = fileXioMount("pfs0:", partition, FIO_MT_RDWR);
 	}
 	if (ret < 0) {
 		PS2_Log("IOP: failed to mount %s as pfs0: (%d)\n", partition, ret);
@@ -357,7 +374,7 @@ int PS2_IOP_PrepareBootPath(const char *boot_path, char *resolved, int resolved_
 	if (hdd > 0)
 		return 1;
 
-	strlcpy(resolved, boot_path, resolved_size);
+	snprintf(resolved, resolved_size, "%s", boot_path);
 	return 1;
 }
 
