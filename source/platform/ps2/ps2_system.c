@@ -64,8 +64,8 @@ void PS2_Log(const char *fmt, ...)
 void PS2_LogToConsole(int enable) { ps2_log_to_console = enable; }
 
 // ---------------------------------------------------------------------------
-// Files. POSIX calls go through the ps2sdk newlib port, which routes them to
-// fileXio/iomanX on the IOP for every device we support (mass:, host:, mc0:).
+// Files. POSIX calls go through the PS2BUILD newlib/fileXio layer, which
+// routes them to iomanX devices (massN:, mmceN:, pfsN:, mcN:, host:, etc.).
 // ---------------------------------------------------------------------------
 
 #define MAX_HANDLES 32
@@ -206,16 +206,19 @@ void Sys_MakeCodeWriteable(unsigned long startaddr, unsigned long length)
 // Paths
 // ---------------------------------------------------------------------------
 
-// Derive the installation root from the boot path:
-//   "mass:/NZP/nzp.elf"  -> "mass:/NZP"
+// Derive the installation root from the resolved boot path. HDD launches are
+// normalized to pfs0: by PS2_IOP_PrepareBootPath() before this function:
+//   "mass1:/NZP/nzp.elf" -> "mass1:/NZP"
+//   "mmce0:/NZP/nzp.elf" -> "mmce0:/NZP"
+//   "pfs0:/NZP/nzp.elf"  -> "pfs0:/NZP"
+//   "mc0:/APPS/nzp.elf"  -> "mc0:/APPS"
 //   "host:nzp.elf"       -> "host:"
-//   "mc0:/APPS/nzp.elf"  -> "mc0:/APPS"  (assets would normally be on USB)
 void PS2_SetGameRootFromBootPath(const char *boot)
 {
 	const char *slash, *colon;
 	size_t len;
 	if (!boot || !*boot) {
-		strlcpy(ps2_game_root, "mass:/NZP", sizeof(ps2_game_root));
+		strlcpy(ps2_game_root, "mass0:/NZP", sizeof(ps2_game_root));
 		return;
 	}
 	slash = strrchr(boot, '/');
@@ -227,7 +230,7 @@ void PS2_SetGameRootFromBootPath(const char *boot)
 	} else if (colon) {
 		len = (size_t)(colon - boot) + 1;
 	} else {
-		strlcpy(ps2_game_root, "mass:/NZP", sizeof(ps2_game_root));
+		strlcpy(ps2_game_root, "mass0:/NZP", sizeof(ps2_game_root));
 		return;
 	}
 	if (len >= sizeof(ps2_game_root))
@@ -240,7 +243,7 @@ void PS2_SetGameRootFromBootPath(const char *boot)
 			ps2_game_root[len] = '/';
 	// "cdrom0:\NZP\NZP.ELF;1" style paths are not supported as a data root
 	if (!strncmp(ps2_game_root, "cdrom", 5))
-		strlcpy(ps2_game_root, "mass:/NZP", sizeof(ps2_game_root));
+		strlcpy(ps2_game_root, "mass0:/NZP", sizeof(ps2_game_root));
 }
 
 const char *PS2_GetGameRoot(void)
