@@ -46,13 +46,15 @@ void PS2_IOP_Report(void);
 // reset. BDM-backed media all reappear as massN: devices.
 int  PS2_IOP_StorageGroupsForBootPath(const char *boot_path);
 
-// Some launchers pass an already-mounted pfsN: path without the APA partition
-// name needed to recreate that mount. Keep the launcher's IOP in that case.
+// Some launchers expose mounts that cannot be reconstructed from argv[0]
+// alone (raw pfsN:, host:, or custom iomanX devices). Preserve the launcher's
+// IOP environment for those paths instead of destroying the mount.
 int  PS2_IOP_BootPathNeedsNoReset(const char *boot_path);
 
 // Recreate device state destroyed by an IOP reset and return a path that can
 // be used by the normal POSIX/fileXio layer. HDD boot paths are remounted as
-// pfs0:; other devices are copied unchanged.
+// pfs0:; massN: is also re-probed because BDM unit numbers can change across
+// an IOP reset. Other devices are copied unchanged.
 int  PS2_IOP_PrepareBootPath(const char *boot_path, char *resolved, int resolved_size);
 
 // Whether a device can enumerate asynchronously and should be waited for
