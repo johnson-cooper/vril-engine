@@ -169,8 +169,9 @@ Hyena_DrawVertices(vertex_t * vertices, int num_vertices, int texture_precision,
 //
 // The PSP-derived mesh builder (gs_mesh.cpp) emits command lists of
 // strips/fans: count, then per vertex a packed uv (2 x s16, value/32767) and,
-// for single pose models, a packed position (3 x u8). Multi pose models take
-// positions from the trivertx poses. The model matrix applies
+// for single pose models, a packed position (3 x s8). Multi pose models take
+// positions from the trivertx poses (stored signed: v - 128 at load, as the
+// GU 8 bit vertex format is signed). The model matrix applies
 // scale_origin and scale * 128, so positions are submitted as v / 128.
 //
 // Pose interpolation is done here on the EE (the PSP used GU morphing).
@@ -224,18 +225,18 @@ void Hyena_DrawAliasBatch(const alias_batch_t *batch)
                 out[i].v = uv[1] * uvscale;
                 commands++;
                 if (batch->packed_static) {
-                    const unsigned char *p = (const unsigned char *)commands;
+                    const signed char *p = (const signed char *)commands;
                     out[i].x = p[0] * inv128;
                     out[i].y = p[1] * inv128;
                     out[i].z = p[2] * inv128;
                     commands++;
                 } else if (pose2) {
-                    const unsigned char *a = pose1[i].v, *b = pose2[i].v;
+                    const signed char *a = (const signed char *)pose1[i].v, *b = (const signed char *)pose2[i].v;
                     out[i].x = (a[0] + (b[0] - a[0]) * blend) * inv128;
                     out[i].y = (a[1] + (b[1] - a[1]) * blend) * inv128;
                     out[i].z = (a[2] + (b[2] - a[2]) * blend) * inv128;
                 } else {
-                    const unsigned char *a = pose1[i].v;
+                    const signed char *a = (const signed char *)pose1[i].v;
                     out[i].x = a[0] * inv128;
                     out[i].y = a[1] * inv128;
                     out[i].z = a[2] * inv128;

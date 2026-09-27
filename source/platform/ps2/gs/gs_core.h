@@ -139,9 +139,13 @@ extern "C" {
 
 #define GS_RGBA(r, g, b, a) \
 	((u32)(((u32)(r) & 0xff) | (((u32)(g) & 0xff) << 8) | (((u32)(b) & 0xff) << 16) | (((u32)(a) & 0xff) << 24)))
-// float components in [0, 1]
+// float components in [0, 1]; saturates (e.g. fullbright model light 1.28)
+static inline u32 gs_color_channel(float v)
+{
+	return v <= 0.0f ? 0u : v >= 1.0f ? 255u : (u32)(v * 255.0f);
+}
 #define GS_COLOR(r, g, b, a) \
-	GS_RGBA((u32)((r) * 255.0f), (u32)((g) * 255.0f), (u32)((b) * 255.0f), (u32)((a) * 255.0f))
+	GS_RGBA(gs_color_channel(r), gs_color_channel(g), gs_color_channel(b), gs_color_channel(a))
 
 #define GS_TRUE  1
 #define GS_FALSE 0
