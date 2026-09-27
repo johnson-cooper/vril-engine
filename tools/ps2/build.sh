@@ -26,6 +26,8 @@ else
 	rm -f "$INFO_TMP"
 fi
 
+# Force a clean Ninja build before invoking PS2BUILD.
+ninja -C build -t clean
 ps2build build "$@"
 
 ELF=build/bin/nzportable.elf
