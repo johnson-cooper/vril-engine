@@ -37,8 +37,12 @@ With Claude Code, the PS2BUILD MCP server can be attached with
 Packages used (all from the default PS2BUILD suite): `pad`, `mc`, `filexio`,
 `patches`, `graph`, `dma`, `packet2`, `draw`, `debug`, `png`, `jpeg`, `z`;
 IRX modules embedded with `embed_irx`: `iomanx`, `filexio`, `sio2man`,
-`padman`, `mcman`, `mcserv`, `usbd_mini`, `bdm`, `bdmfs_fatfs`,
-`usbmass_bd_mini`, `libsd`, plus the project's own `nzpsnd` IOP target.
+`padman`, `mcman`, `mcserv`; BDM/FAT storage via `usbd_mini`,
+`usbmass_bd_mini`, `mx4sio_bd_mini`, `iLinkman`, `IEEE1394_bd_mini`,
+`bdm` and `bdmfs_fatfs`; MMCE via `mmceman`; HDD/PFS via `dev9`,
+`atad`, `apa` and `fs`; `libsd`, plus the project's own `nzpsnd`
+IOP target. Storage drivers are selected at runtime from the ELF boot path
+instead of all being kept resident at once.
 
 ## 2. Building
 
@@ -47,8 +51,9 @@ IRX modules embedded with `embed_irx`: `iomanx`, `filexio`, `sio2man`,
 ```
 
 The script writes `source/_build_info.h` (git hash / branch / build date,
-shown in the startup banner and in crash reports) and runs
-`ps2build build`. Once that header exists, plain `ps2build build` works too.
+shown in the startup banner and in crash reports), runs
+`ninja -C build -t clean`, then runs `ps2build build`. Once that header
+exists, plain `ps2build build` still works too.
 
 Output:
 
@@ -65,16 +70,25 @@ file.
 ## 3. Game data layout
 
 The ELF finds its data relative to the directory it was started from
-(`PS2_GetGameRoot()`), so the installation is:
+(`PS2_GetGameRoot()`). Keep `nzportable.elf` and `nzp/` together on
+whichever supported device you launch from:
 
 ```
-mass:/NZP/                 (or any folder on the USB drive)
+<device>:/NZP/
     nzportable.elf
     setup.ini              optional: extra command line arguments
     nzp/
         progs.dat
         maps/  gfx/  models/  sounds/  textures/  tracks/  data/ ...
 ```
+
+Supported boot roots include `mass0:`/`mass1:` and other BDM `massN:`
+devices (USB, MX4SIO and i.Link), `mmce0:`/`mmce1:`, `mc0:`/`mc1:`,
+internal HDD/PFS, and `host:`. Standard HDD paths such as
+`hdd0:partition:pfs:/NZP/nzportable.elf` are automatically remounted as
+`pfs0:` after the IOP reset. If a launcher only supplies an already-mounted
+`pfsN:` path, or an otherwise unknown iomanX device prefix, the port
+preserves that launcher's IOP filesystem environment instead of resetting it.
 
 Use the **PSP asset set** (`nzportable-psp.zip` from the NZ:P releases, or
 `assets/psp` + `assets/common` from `nzp-team/assets`): copy its
@@ -98,13 +112,17 @@ straight into a map.
 
 ### Real hardware
 
-1. FAT32/exFAT USB stick, copy `nzportable.elf` + `nzp/` into e.g.
-   `mass:/NZP/`.
+1. Copy `nzportable.elf` + `nzp/` to the same directory on the desired
+   storage device.
 2. Launch the ELF with any homebrew launcher (wLaunchELF, OPL's app list,
-   FMCB/PS2BBL entries...). The IOP is reset and every driver the game
-   needs is loaded from inside the ELF — no IRX folder is required.
-3. When launched through **ps2link** (`host:` on real hardware), pass
-   `-noiopreset`; resetting the IOP would drop the ps2link connection.
+   FMCB/PS2BBL entries...). For known devices the port rebuilds only the
+   required storage stack from IRX modules embedded in the ELF; no external
+   IRX folder is required.
+3. `massN:` boots restore BDM/FAT plus the USB/MX4SIO/i.Link transports,
+   `mmceN:` boots restore MMCEMAN, and standard `hdd0:...:pfs:...` boots
+   restore DEV9/ATA/APA/PFS and remount their partition automatically.
+   `host:`, raw `pfsN:`, and unknown launcher-provided iomanX devices
+   automatically preserve the launcher's IOP environment.
 
 Video mode follows the console region (NTSC 640x448 / PAL 640x512,
 interlaced, flicker filtered). `-ntsc` / `-pal` force a mode.
