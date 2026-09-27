@@ -155,9 +155,20 @@ targets:
       - padman
       - mcman
       - mcserv
+      # BDM mass storage: USB, MX4SIO and i.Link all enumerate as massN:
       - usbd_mini
       - bdm
       - bdmfs_fatfs
       - usbmass_bd_mini
+      - mx4sio_bd_mini
+      - iLinkman
+      - IEEE1394_bd_mini
+      # MMCE filesystem devices (mmce0:/mmce1:)
+      - mmceman
+      # Internal HDD/PFS boot recovery
+      - dev9
+      - atad
+      - apa
+      - fs
       - libsd
       - nzpsnd
