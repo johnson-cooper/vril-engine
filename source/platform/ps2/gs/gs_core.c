@@ -932,6 +932,7 @@ typedef struct {
 	int nreg;
 	u64 prim_flags;   // IIP/TME/FGE/ABE/FST bits (without primitive type)
 	float zscale, zbias;
+	float tex_bias_s, tex_bias_t;
 } draw_ctx_t;
 
 static draw_ctx_t dc;
@@ -962,6 +963,8 @@ static void draw_ctx_setup(int vtype)
 	// depth range mapping: ndc z in [-1, 1] -> [near, far] (renderer units)
 	dc.zscale = (st.depth_far - st.depth_near) * 0.5f;
 	dc.zbias  = (st.depth_far + st.depth_near) * 0.5f + (float)st.depth_offset;
+	dc.tex_bias_s = 0.0f;
+	dc.tex_bias_t = 0.0f;
 
 	if (!dc.textured && st.caps[GS_CAP_TEXTURE_2D])
 		;  // texture state is irrelevant for this draw
@@ -1183,8 +1186,8 @@ static inline void transform_vertex(const vfmt_t *f, const u8 *src, cvert_t *o)
 	o->y = m[1] * x + m[5] * y + m[9]  * z + m[13];
 	o->z = m[2] * x + m[6] * y + m[10] * z + m[14];
 	o->w = m[3] * x + m[7] * y + m[11] * z + m[15];
-	o->s = s * st.tex_su + st.tex_ou;
-	o->t = t * st.tex_sv + st.tex_ov;
+	o->s = s * st.tex_su + st.tex_ou - dc.tex_bias_s;
+	o->t = t * st.tex_sv + st.tex_ov - dc.tex_bias_t;
 	o->color = c;
 	o->fog = o->w;
 	o->out = outcode(o);
@@ -1276,6 +1279,25 @@ void GS_DrawArray(int prim, int vtype, int count, const void *indices, const voi
 
 	vfmt_decode(vtype, &f);
 	draw_ctx_setup(vtype);
+
+	// The GS drops the low 8 bits of the ST mantissa. Quake world textures can
+	// carry large repeating coordinates, which amplifies that precision loss
+	// into visible texture swimming. Rebase repeat-wrapped ST close to zero per
+	// draw; subtracting whole texture periods is visually identical under REPEAT.
+	if (!dc.is2d && dc.textured && count > 0 &&
+	    (st.wrap_u == GS_REPEAT || st.wrap_v == GS_REPEAT)) {
+		float x, y, z, s, t;
+		u32 color;
+		vfmt_fetch(&f, vtx_ptr(&f, vertices, indices, 0), 0,
+		           &x, &y, &z, &s, &t, &color);
+		s = s * st.tex_su + st.tex_ou;
+		t = t * st.tex_sv + st.tex_ov;
+		if (st.wrap_u == GS_REPEAT)
+			dc.tex_bias_s = floorf(s);
+		if (st.wrap_v == GS_REPEAT)
+			dc.tex_bias_t = floorf(t);
+	}
+
 	gs_stats.verts_in += count;
 
 	if (dc.is2d) {
