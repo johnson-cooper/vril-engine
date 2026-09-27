@@ -244,6 +244,8 @@ int PS2_IOP_StorageGroupsForBootPath(const char *boot_path)
 		return PS2_IOP_MASS;
 	if (!strncmp(boot_path, "mmce", 4))
 		return PS2_IOP_MMCE;
+	if (!strncmp(boot_path, "mc0:", 4) || !strncmp(boot_path, "mc1:", 4))
+		return PS2_IOP_MC;
 	if (!strncmp(boot_path, "hdd", 3))
 		return PS2_IOP_HDD;
 	// pfsN: is already a mounted HDD partition. Without the APA partition
