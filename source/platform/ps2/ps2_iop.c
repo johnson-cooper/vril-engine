@@ -56,6 +56,14 @@ DECLARE_IRX(usbd_mini);
 DECLARE_IRX(bdm);
 DECLARE_IRX(bdmfs_fatfs);
 DECLARE_IRX(usbmass_bd_mini);
+DECLARE_IRX(mx4sio_bd_mini);
+DECLARE_IRX(iLinkman);
+DECLARE_IRX(IEEE1394_bd_mini);
+DECLARE_IRX(mmceman);
+DECLARE_IRX(dev9);
+DECLARE_IRX(atad);
+DECLARE_IRX(apa);
+DECLARE_IRX(fs);
 DECLARE_IRX(libsd);
 DECLARE_IRX(nzpsnd);
 
@@ -70,21 +78,47 @@ typedef struct {
 	int id;         // module id (<0 = failed)
 	int result;     // module start result
 	int loaded;
+	int inherited;  // preserved from the launcher's IOP when reset is skipped
 } ps2_irx_t;
+
+// Conservative, well-tested HDD/PFS cache settings used by wLaunchELF-style
+// homebrew. They keep IOP RAM bounded while leaving enough handles for the game.
+static const char hdd_args[] = "-o\0" "4\0" "-n\0" "20";
+static const char pfs_args[] = "-m\0" "4\0" "-o\0" "10\0" "-n\0" "40";
 
 // Order matters: dependencies first.
 static ps2_irx_t irx_table[] = {
 	{ "iomanX",          PS2_IOP_CORE,  iomanx_irx,          &size_iomanx_irx,          NULL, 0 },
 	// fileXio: keep its read/write staging buffer modest (IOP RAM)
 	{ "fileXio",         PS2_IOP_CORE,  filexio_irx,         &size_filexio_irx,         NULL, 0 },
-	{ "sio2man",         PS2_IOP_PAD | PS2_IOP_MC, sio2man_irx, &size_sio2man_irx,     NULL, 0 },
+
+	// SIO2 is shared by pads, real memory cards, MX4SIO and MMCE.
+	{ "sio2man",         PS2_IOP_PAD | PS2_IOP_MC | PS2_IOP_MASS | PS2_IOP_MMCE,
+	                     sio2man_irx, &size_sio2man_irx, NULL, 0 },
 	{ "padman",          PS2_IOP_PAD,   padman_irx,          &size_padman_irx,          NULL, 0 },
 	{ "mcman",           PS2_IOP_MC,    mcman_irx,           &size_mcman_irx,           NULL, 0 },
 	{ "mcserv",          PS2_IOP_MC,    mcserv_irx,          &size_mcserv_irx,          NULL, 0 },
-	{ "usbd_mini",       PS2_IOP_USB,   usbd_mini_irx,       &size_usbd_mini_irx,       NULL, 0 },
-	{ "bdm",             PS2_IOP_USB,   bdm_irx,             &size_bdm_irx,             NULL, 0 },
-	{ "bdmfs_fatfs",     PS2_IOP_USB,   bdmfs_fatfs_irx,     &size_bdmfs_fatfs_irx,     NULL, 0 },
-	{ "usbmass_bd_mini", PS2_IOP_USB,   usbmass_bd_mini_irx, &size_usbmass_bd_mini_irx, NULL, 0 },
+
+	// BDM mass storage. The pathname exposed by bdmfs is massN: regardless of
+	// whether the block transport is USB, MX4SIO or i.Link, so restore all
+	// three lightweight transports when the ELF itself came from massN:.
+	{ "usbd_mini",       PS2_IOP_MASS, usbd_mini_irx,        &size_usbd_mini_irx,        NULL, 0 },
+	{ "bdm",             PS2_IOP_MASS, bdm_irx,              &size_bdm_irx,              NULL, 0 },
+	{ "bdmfs_fatfs",     PS2_IOP_MASS, bdmfs_fatfs_irx,      &size_bdmfs_fatfs_irx,      NULL, 0 },
+	{ "usbmass_bd_mini", PS2_IOP_MASS, usbmass_bd_mini_irx,  &size_usbmass_bd_mini_irx,  NULL, 0 },
+	{ "mx4sio_bd_mini",  PS2_IOP_MASS, mx4sio_bd_mini_irx,   &size_mx4sio_bd_mini_irx,   NULL, 0 },
+	{ "iLinkman",        PS2_IOP_MASS, iLinkman_irx,         &size_iLinkman_irx,         NULL, 0 },
+	{ "IEEE1394_bd_mini",PS2_IOP_MASS, IEEE1394_bd_mini_irx, &size_IEEE1394_bd_mini_irx, NULL, 0 },
+
+	// MMCE exposes mmce0:/mmce1: directly through iomanX/fileXio.
+	{ "mmceman",         PS2_IOP_MMCE, mmceman_irx,          &size_mmceman_irx,          NULL, 0 },
+
+	// Internal HDD: DEV9 -> ATA -> APA (hdd0:) -> PFS (pfs0:).
+	{ "dev9",            PS2_IOP_HDD,  dev9_irx,             &size_dev9_irx,             NULL, 0 },
+	{ "atad",            PS2_IOP_HDD,  atad_irx,             &size_atad_irx,             NULL, 0 },
+	{ "apa",             PS2_IOP_HDD,  apa_irx,              &size_apa_irx,              hdd_args, sizeof(hdd_args) },
+	{ "fs",              PS2_IOP_HDD,  fs_irx,               &size_fs_irx,               pfs_args, sizeof(pfs_args) },
+
 	{ "libsd",           PS2_IOP_AUDIO, libsd_irx,           &size_libsd_irx,           NULL, 0 },
 	{ "nzpsnd",          PS2_IOP_AUDIO, nzpsnd_irx,          &size_nzpsnd_irx,          NULL, 0 },
 };
@@ -99,6 +133,7 @@ static int load_irx(ps2_irx_t *m)
 	int res = 0;
 	m->id = SifExecModuleBuffer(m->data, *m->size, m->args_len, m->args, &res);
 	m->result = res;
+	m->inherited = 0;
 	m->loaded = (m->id >= 0 && (res & 3) != 1);   // MODULE_NO_RESIDENT_END == 1
 	if (!m->loaded)
 		PS2_Log("IOP: FAILED to load %s (id %d, result %d)\n", m->name, m->id, res);
@@ -110,9 +145,18 @@ static int load_irx(ps2_irx_t *m)
 void PS2_IOP_Init(const char *boot_path, int groups, int no_reset)
 {
 	int i;
+	const int storage_groups = PS2_IOP_MASS | PS2_IOP_MMCE | PS2_IOP_HDD;
 	(void)boot_path;
 
 	groups_requested = groups;
+	groups_ready = 0;
+	iop_was_reset = 0;
+	for (i = 0; i < IRX_COUNT; i++) {
+		irx_table[i].id = -1;
+		irx_table[i].result = 0;
+		irx_table[i].loaded = 0;
+		irx_table[i].inherited = 0;
+	}
 	SifInitRpc(0);
 
 	if (!no_reset) {
@@ -136,11 +180,24 @@ void PS2_IOP_Init(const char *boot_path, int groups, int no_reset)
 		ps2_irx_t *m = &irx_table[i];
 		if (!(m->group & groups))
 			continue;
+
+		// When the launcher's IOP must be preserved (notably a raw pfsN:
+		// boot path), do not replace its filesystem/device stack: that would
+		// destroy the very mount we are trying to keep. Pad/audio services are
+		// still loaded normally.
+		if (no_reset &&
+		    ((m->group == PS2_IOP_CORE) ||
+		     ((m->group & storage_groups) &&
+		      !(m->group & (PS2_IOP_PAD | PS2_IOP_MC | PS2_IOP_AUDIO))))) {
+			m->loaded = 1;
+			m->inherited = 1;
+			continue;
+		}
 		load_irx(m);
 	}
 
-	// A group is ready when all of its modules loaded.
-	for (i = 0; i < 5; i++) {
+	// A group is ready when all of its modules loaded (or were inherited).
+	for (i = 0; i <= 6; i++) {
 		int g = 1 << i, j, ok = 1;
 		if (!(groups & g))
 			continue;
@@ -171,11 +228,137 @@ void PS2_IOP_Report(void)
 		ps2_irx_t *m = &irx_table[i];
 		if (!(m->group & groups_requested))
 			continue;
-		PS2_Log("  %-16s %6u bytes  %s\n", m->name, *m->size, m->loaded ? "loaded" : "FAILED");
-		if (m->loaded)
+		PS2_Log("  %-16s %6u bytes  %s\n", m->name, *m->size,
+			m->inherited ? "inherited" : (m->loaded ? "loaded" : "FAILED"));
+		if (m->loaded && !m->inherited)
 			total += *m->size;
 	}
 	PS2_Log("  total module images: %u KiB of 2048 KiB IOP RAM\n", total / 1024);
+}
+
+int PS2_IOP_StorageGroupsForBootPath(const char *boot_path)
+{
+	if (!boot_path || !*boot_path)
+		return PS2_IOP_MASS;
+	if (!strncmp(boot_path, "mass", 4))
+		return PS2_IOP_MASS;
+	if (!strncmp(boot_path, "mmce", 4))
+		return PS2_IOP_MMCE;
+	if (!strncmp(boot_path, "hdd", 3))
+		return PS2_IOP_HDD;
+	// pfsN: is already a mounted HDD partition. Without the APA partition
+	// name in argv[0] it cannot be reconstructed after reset, so it is
+	// deliberately preserved instead (see PS2_IOP_BootPathNeedsNoReset).
+	return 0;
+}
+
+int PS2_IOP_BootPathNeedsNoReset(const char *boot_path)
+{
+	if (!boot_path)
+		return 0;
+	return !strncmp(boot_path, "pfs", 3);
+}
+
+int PS2_IOP_ShouldWaitForDevice(const char *root)
+{
+	if (!root)
+		return 0;
+	return !strncmp(root, "mass", 4) ||
+	       !strncmp(root, "mmce", 4) ||
+	       !strncmp(root, "pfs", 3) ||
+	       !strncmp(root, "mc0:", 4) ||
+	       !strncmp(root, "mc1:", 4);
+}
+
+static int prepare_hdd_boot_path(const char *boot_path, char *resolved, int resolved_size)
+{
+	char normalized[512];
+	char partition[160];
+	const char *p;
+	const char *inner;
+	const char *sep;
+	const char *slash;
+	size_t part_len;
+	int ret;
+	size_t i;
+
+	if (!boot_path || strncmp(boot_path, "hdd0:", 5))
+		return 0;
+
+	strlcpy(normalized, boot_path, sizeof(normalized));
+	for (i = 0; normalized[i]; i++)
+		if (normalized[i] == '\\')
+			normalized[i] = '/';
+
+	p = normalized + 5;
+	inner = NULL;
+
+	if (*p == '/') {
+		// wLaunchELF-style path: hdd0:/partition/path/to/file
+		p++;
+		slash = strchr(p, '/');
+		part_len = slash ? (size_t)(slash - p) : strlen(p);
+		inner = slash ? slash : "/";
+	} else {
+		// Standard homebrew boot path:
+		// hdd0:partition:pfs:/path/to/file
+		sep = strstr(p, ":pfs:");
+		if (!sep) {
+			PS2_Log("IOP: unsupported HDD boot path (missing :pfs:): %s\n", normalized);
+			return -1;
+		}
+		part_len = (size_t)(sep - p);
+		inner = sep + 5;
+		if (!*inner)
+			inner = "/";
+	}
+
+	if (part_len == 0 || part_len + 6 >= sizeof(partition)) {
+		PS2_Log("IOP: invalid HDD partition in boot path: %s\n", normalized);
+		return -1;
+	}
+
+	snprintf(partition, sizeof(partition), "hdd0:%.*s", (int)part_len, p);
+
+	ret = fileXioMount("pfs0:", partition, FIO_MT_RDONLY);
+	if (ret < 0) {
+		// A launcher may have left pfs0: mounted when -noiopreset was used.
+		fileXioUmount("pfs0:");
+		ret = fileXioMount("pfs0:", partition, FIO_MT_RDONLY);
+	}
+	if (ret < 0) {
+		PS2_Log("IOP: failed to mount %s as pfs0: (%d)\n", partition, ret);
+		return -1;
+	}
+
+	if (inner[0] == '/')
+		snprintf(resolved, resolved_size, "pfs0:%s", inner);
+	else
+		snprintf(resolved, resolved_size, "pfs0:/%s", inner);
+
+	PS2_Log("IOP: remounted HDD boot partition %s -> pfs0:\n", partition);
+	return 1;
+}
+
+int PS2_IOP_PrepareBootPath(const char *boot_path, char *resolved, int resolved_size)
+{
+	int hdd;
+
+	if (!resolved || resolved_size <= 0)
+		return 0;
+	resolved[0] = 0;
+
+	if (!boot_path || !*boot_path)
+		return 1;
+
+	hdd = prepare_hdd_boot_path(boot_path, resolved, resolved_size);
+	if (hdd < 0)
+		return 0;
+	if (hdd > 0)
+		return 1;
+
+	strlcpy(resolved, boot_path, resolved_size);
+	return 1;
 }
 
 int PS2_WaitForDevice(const char *root, int timeout_ms)
