@@ -747,7 +747,10 @@ void GS_UpdateMatrix(void)
 // Transient vertex arena
 // ===========================================================================
 
-#define ARENA_SIZE (160 * 1024)
+// Busy world frames can transiently need well over 160 KiB of source vertices.
+// Keep this fixed-size (no per-frame malloc) but leave enough headroom for dense
+// scenes; 512 KiB is a small bounded cost relative to the PS2 EE free-memory margin.
+#define ARENA_SIZE (512 * 1024)
 static u8  arena[ARENA_SIZE] __attribute__((aligned(64)));
 static int arena_used;
 static int arena_outstanding;   // allocations not yet consumed by a draw
