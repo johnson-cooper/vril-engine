@@ -2082,11 +2082,14 @@ void R_RenderScene (void)
 		h);
 	GS_Scissor(x, glheight - y2 - h, x + w, glheight - y2);
 
-    screenaspect = (float)renderrect->width/renderrect->height;
+    // NTSC/PAL PS2 output is displayed as 4:3 even though the framebuffer
+    // raster is 640x448 / 640x512.  Treating those pixels as square makes
+    // the 3D projection vertically distorted (most noticeably on floors).
+    screenaspect = 4.0f / 3.0f;
 
 	 //johnfitz -- warp view for underwater
 	fovx = screenaspect;
-	fovy = r_refdef.fov_y;
+	fovy = RAD2DEG(atanf(tanf(DEG2RAD(r_refdef.fov_x) * 0.5f) / screenaspect)) * 2.0f;
 	if (r_waterwarp.value)
 	{
 		contents = Mod_PointInLeaf (r_origin, cl.worldmodel)->contents;
