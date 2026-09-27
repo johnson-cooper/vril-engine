@@ -793,7 +793,9 @@ static void gif_tag_close(void)
 		pkt_ptr = gt_tag;
 	} else {
 		int words = gt_count * gt_nreg;
-		gt_tag[0] = GIF_SET_TAG(gt_count, 1, 1, gt_prim, GIF_FLG_REGLIST, gt_nreg);
+		// PRE/PRIM are only honoured in PACKED mode; PRIM was written via A+D
+		// just before this tag (see gif_tag_begin).
+		gt_tag[0] = GIF_SET_TAG(gt_count, 1, 0, 0, GIF_FLG_REGLIST, gt_nreg);
 		gt_tag[1] = gt_regs;
 		if (words & 1) {
 			pkt_ptr[0] = 0;  // pad to a qword; ignored by the GIF
@@ -814,7 +816,14 @@ static void gif_tag_begin(u64 prim, u64 regs, int nreg, int nverts, int list, in
 		return;
 	}
 	gif_tag_close();
-	pkt_reserve(qw + 1);
+	pkt_reserve(qw + 3);
+	// The GIF ignores the PRIM field of REGLIST tags, so start the primitive
+	// with an explicit A+D write (this also resets the GS vertex queue).
+	pkt_ptr[0] = GIF_SET_TAG(1, 1, 0, 0, GIF_FLG_PACKED, 1);
+	pkt_ptr[1] = GIF_AD;
+	pkt_ptr[2] = prim;
+	pkt_ptr[3] = GS_REG_PRIM;
+	pkt_ptr += 4;
 	gt_tag = pkt_ptr;
 	pkt_ptr += 2;
 	gt_prim = prim;

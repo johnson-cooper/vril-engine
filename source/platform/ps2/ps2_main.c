@@ -113,8 +113,6 @@ int main(int argc, char **argv)
 
 	Host_Init(&parms);
 	PS2_LogToConsole(1);
-	PS2_MemRegisterCommands();
-	PS2_ProfileInit();
 	PS2_MemReport("startup");
 
 	{

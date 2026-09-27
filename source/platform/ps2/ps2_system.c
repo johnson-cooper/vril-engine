@@ -234,6 +234,10 @@ void PS2_SetGameRootFromBootPath(const char *boot)
 		len = sizeof(ps2_game_root) - 1;
 	memcpy(ps2_game_root, boot, len);
 	ps2_game_root[len] = 0;
+	// PCSX2 passes Windows paths ("host:E:\dir\nzp.elf"); use forward slashes
+	for (len = 0; ps2_game_root[len]; len++)
+		if (ps2_game_root[len] == '\\')
+			ps2_game_root[len] = '/';
 	// "cdrom0:\NZP\NZP.ELF;1" style paths are not supported as a data root
 	if (!strncmp(ps2_game_root, "cdrom", 5))
 		strlcpy(ps2_game_root, "mass:/NZP", sizeof(ps2_game_root));

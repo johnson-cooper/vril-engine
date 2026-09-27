@@ -687,6 +687,10 @@ int Datagram_Init ()
 
 	if (COM_CheckParm("-nolan"))
 		return -1;
+	// PS2: no LAN driver is registered until DEV9 networking is added.
+	if (net_numlandrivers <= 0 || net_driver_to_use >= net_numlandrivers ||
+		!net_landrivers[net_driver_to_use].Init)
+		return -1;
 	//0 for Infrastructure
 	//1 for adhoc for net_driver_to_use
 	i = net_driver_to_use;//for (i = 0; i < net_numlandrivers; i++)

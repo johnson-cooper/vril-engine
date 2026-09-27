@@ -67,6 +67,8 @@ void VID_Init(unsigned char* palette)
 
 	Cvar_RegisterVariable(&r_ps2_vsyncinterval);
 	Cvar_RegisterVariable(&r_ps2_z24);
+	PS2_MemRegisterCommands();
+	PS2_ProfileInit();
 
 	GS_Init(force, COM_CheckParm("-z24") ? 1 : 0);
 
