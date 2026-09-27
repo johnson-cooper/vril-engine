@@ -52,6 +52,8 @@ targets:
       - RENDERER_SUPPORTS_DITHERING
       - PLATFORM_KEYBOARD_OSK
       - PLATFORM_SUPPORTS_RUMBLE
+      # settings are kept in ps2_config.cfg (see README_PS2.md)
+      - FILE_SPECIAL_PREFIX=\"ps2_\"
     headers: [kernel, graph, dma, draw, packet2, packet, math3d]
     cflags: [-G0, -fno-strict-aliasing, -fno-rtti, -fno-exceptions, -Wno-write-strings, -Wno-sign-compare]
 

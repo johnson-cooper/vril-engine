@@ -54,6 +54,9 @@ extern "C" {
 #define GS_TRIANGLE_STRIP  4
 #define GS_TRIANGLE_FAN    5
 #define GS_SPRITES         6
+// Fan of independent triangles (non planar, e.g. alias models): culled and
+// clipped per triangle. GS_TRIANGLE_FAN assumes a planar convex polygon.
+#define GS_TRIANGLE_FAN_TRIS 7
 
 // ---------------------------------------------------------------------------
 // Vertex type flags (GS_DrawArray vtype). Vertex element order in memory is

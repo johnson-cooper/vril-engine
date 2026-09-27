@@ -213,7 +213,7 @@ void Hyena_DrawAliasBatch(const alias_batch_t *batch)
         const float blend = batch->blend;
 
         while ((count = *commands++) != 0) {
-            int mode = count < 0 ? GS_TRIANGLE_FAN : GS_TRIANGLE_STRIP;
+            int mode = count < 0 ? GS_TRIANGLE_FAN_TRIS : GS_TRIANGLE_STRIP;
             alias_out_t *out;
             int i;
             if (count < 0)

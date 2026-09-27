@@ -1340,6 +1340,29 @@ void GS_DrawArray(int prim, int vtype, int count, const void *indices, const voi
 		}
 		return;
 	}
+	case GS_TRIANGLE_FAN_TRIS: {
+		// Non planar fan: every triangle (v0, vi, vi+1) is culled/clipped on
+		// its own. Vertex 0 is kept in slot 0 across batches.
+		int base = 1;
+		transform_vertex(&f, vtx_ptr(&f, vertices, indices, 0), &xf[0]);
+		while (base + 1 < count) {
+			int n = count - base;
+			if (n > XFORM_BATCH - 1) n = XFORM_BATCH - 1;
+			for (i = 0; i < n; i++)
+				transform_vertex(&f, vtx_ptr(&f, vertices, indices, base + i), &xf[1 + i]);
+			for (i = 1; i < n; i++) {
+				cvert_t tri[3];
+				int o = xf[0].out | xf[i].out | xf[i + 1].out;
+				int a = xf[0].out & xf[i].out & xf[i + 1].out;
+				tri[0] = xf[0]; tri[1] = xf[i]; tri[2] = xf[i + 1];
+				draw_polygon(tri, 3, o, a);
+			}
+			if (base + n >= count)
+				break;
+			base += n - 1;   // share the last vertex with the next batch
+		}
+		return;
+	}
 	case GS_TRIANGLE_STRIP: {
 		int base = 0;
 		int parity = 0;

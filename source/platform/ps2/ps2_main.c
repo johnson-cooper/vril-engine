@@ -51,6 +51,31 @@ static int has_arg(int argc, char **argv, const char *name)
 	return 0;
 }
 
+// DualShock 2 defaults, following the NZ:P twin stick console layout with
+// fire on R1 and aim on L1. Everything stays rebindable in the menus.
+static void PS2_ApplyDefaultBindings(void)
+{
+	Cbuf_AddText("unbindall\n");
+	Cbuf_AddText("bind START \"togglemenu\"\n");
+	Cbuf_AddText("bind RTRIGGER \"+attack\"\n");
+	Cbuf_AddText("bind LTRIGGER \"+aim\"\n");
+	Cbuf_AddText("bind ZRTRIGGER \"+grenade\"\n");
+	Cbuf_AddText("bind ZLTRIGGER \"impulse 33\"\n");
+	Cbuf_AddText("bind LEFTFACE \"+reload\"\n");
+	Cbuf_AddText("bindhold LEFTFACE \"+use\"\n");
+	Cbuf_AddText("bind TOPFACE \"+switch\"\n");
+	Cbuf_AddText("bind BOTTOMFACE \"+jump\"\n");
+	Cbuf_AddText("bind RIGHTFACE \"impulse 31\"\n");
+	Cbuf_AddText("bindhold RIGHTFACE \"impulse 32\"\n");
+	Cbuf_AddText("bind LTHUMB \"impulse 23\"\n");
+	Cbuf_AddText("bind RTHUMB \"+knife\"\n");
+	Cbuf_AddText("bind DPAD_RIGHT \"impulse 22\"\n");
+	Cbuf_AddText("bind SELECT \"+showscores\"\n");
+	Cbuf_AddText("in_mlook 1\n");
+	Cbuf_AddText("cl_maxfps 30\n");
+	PS2_Log("PS2: no ps2_config.cfg yet, applied DualShock 2 default bindings\n");
+}
+
 static int file_exists(const char *path)
 {
 	struct stat st;
@@ -113,6 +138,16 @@ int main(int argc, char **argv)
 
 	Host_Init(&parms);
 	PS2_LogToConsole(1);
+
+	// First run: no PS2 settings yet, so nzp.rc fell back to the shared
+	// (handheld) config.cfg. Apply the DualShock 2 layout on top; the first
+	// Host_WriteConfiguration then creates ps2_config.cfg.
+	{
+		char cfg[MAX_OSPATH];
+		snprintf(cfg, sizeof(cfg), "%s/%sconfig.cfg", com_gamedir, FILE_SPECIAL_PREFIX);
+		if (!file_exists(cfg))
+			PS2_ApplyDefaultBindings();
+	}
 	PS2_MemReport("startup");
 
 	{
