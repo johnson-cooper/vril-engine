@@ -1024,7 +1024,7 @@ void R_SetupAliasBlendedFrame (int frame, aliashdr_t *paliashdr, entity_t* e)
 
 void IgnoreInterpolatioFrame (entity_t *e, aliashdr_t *paliashdr)
 {
-	if (strcmp(e->old_model, e->model->name) && e->model != NULL)
+	if (e->model != NULL && strcmp(e->old_model, e->model->name))
 	{
 		strcpy(e->old_model, e->model->name);
         // fenix@io.com: model transform interpolation
@@ -1223,8 +1223,8 @@ R_DrawAliasModel
 */
 
 int partial_zombies_drawn;
-aliashdr_t * zcfull_mdl;
-aliashdr_t * zfull_mdl;
+model_t *zcfull_model;
+model_t *zfull_model;
 
 void R_DrawAliasModel (entity_t *e)
 {
@@ -1370,10 +1370,13 @@ void R_DrawAliasModel (entity_t *e)
 	if (specChar == '%') {
 		bool limbs_in_tact = (e->z_head != 0) && (e->z_larm != 0) && (e->z_rarm != 0);
 		if (partial_zombies_drawn > 5 || limbs_in_tact) {
+			// Alias model data lives in Quake's movable cache. Keep stable model
+			// handles globally, but reacquire the cache data before each draw so
+			// mystery-box weapon churn cannot leave zombies using stale pointers.
 			if(clmodel->name[12] == 'c')
-				paliashdr = zcfull_mdl;
+				paliashdr = (aliashdr_t *)Mod_Extradata(zcfull_model);
 			else
-				paliashdr = zfull_mdl;
+				paliashdr = (aliashdr_t *)Mod_Extradata(zfull_model);
 		} else {
 			partial_zombies_drawn += 1;
 			draw_partial_zombie = true;

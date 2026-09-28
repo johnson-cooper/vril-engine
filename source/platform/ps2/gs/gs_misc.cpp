@@ -403,8 +403,10 @@ void R_NewMap (void)
 		LoadMapConfig();
 	}
 
-	zfull_mdl = (aliashdr_t *) Mod_Extradata(Mod_FindName("models/ai/zfull.mdl"));
-	zcfull_mdl = (aliashdr_t *) Mod_Extradata(Mod_FindName("models/ai/zcfull.mdl"));
+	// Keep model handles, not raw Mod_Extradata pointers. Alias cache data is
+	// movable/evictable and must be reacquired when the model is drawn.
+	zfull_model = Mod_FindName("models/ai/zfull.mdl");
+	zcfull_model = Mod_FindName("models/ai/zcfull.mdl");
 }
 
 
